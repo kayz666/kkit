@@ -1,0 +1,9 @@
+.DS_Store
+.idea/
+*.iml
+.log
+logs
+target
+node_modules
+*.iws
+*.ipr
