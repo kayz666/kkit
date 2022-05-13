@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.bestkayz.kkit.plugins.boot.PluginsLoaderConfig
+

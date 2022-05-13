@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: plugins-test
+  main:
+    allow-bean-definition-overriding: true
+server:
+  port: 7001
+
+

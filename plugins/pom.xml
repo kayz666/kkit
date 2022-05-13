@@ -9,13 +9,12 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>kkit-common</artifactId>
+    <artifactId>kkit-plugins</artifactId>
     <packaging>pom</packaging>
     <modules>
-        <module>common-tools</module>
-        <module>common-http</module>
-        <module>common-core</module>
-        <module>common-spring</module>
+        <module>plugins-core</module>
+        <module>plugins-spring-boot-starter</module>
+        <module>plugins-sample</module>
     </modules>
 
     <properties>
