@@ -2,18 +2,18 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <artifactId>kkit-parent</artifactId>
-        <groupId>io.github.kayz666</groupId>
-        <version>1.0-SNAPSHOT</version>
-    </parent>
+
     <modelVersion>4.0.0</modelVersion>
 
+    <groupId>io.github.kayz666</groupId>
     <artifactId>kkit-mqtt</artifactId>
+    <version>1.0.4</version>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
+        <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
@@ -27,13 +27,13 @@
         <dependency>
             <groupId>io.github.kayz666</groupId>
             <artifactId>kkit-common-core</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0.4</version>
         </dependency>
 
         <dependency>
             <groupId>io.github.kayz666</groupId>
             <artifactId>kkit-common-tools</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0.4</version>
         </dependency>
 
         <dependency>

@@ -31,11 +31,13 @@ public class Test {
             }
         };
         try {
-            HikSDKProvider hikSDKProvider = HikSDKTool.builder("192.168.1.151","Admin12345",hikCallBack,"12").build();
+            HikSDKProvider hikSDKProvider = HikSDKTool.builder("192.168.1.116","Admin12345",hikCallBack,"12").build();
 
             log.info(JSONObject.toJSONString(hikSDKProvider.getDeviceInfo()));
             log.info(JSONObject.toJSONString(hikSDKProvider.getTime()));
-            log.info(JSONObject.toJSONString(hikSDKProvider.queryDeviceEmployee("60052")));
+            log.info(JSONObject.toJSONString(hikSDKProvider.getAllUserCard()));
+            log.info(JSONObject.toJSONString(hikSDKProvider.queryDeviceEmployee("10003")));
+            log.info(JSONObject.toJSONString(hikSDKProvider.queryPersonFace("10003")));
         }catch (Exception e){
             log.warn("",e);
         }

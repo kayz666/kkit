@@ -4,6 +4,7 @@ package com.bestkayz.kkit.hiksdk.provider;
 import com.bestkayz.kkit.common.core.base.Result;
 import com.bestkayz.kkit.hiksdk.lib.HCNetSDK;
 import com.bestkayz.kkit.hiksdk.provider.impl.HikSDKProviderImpl;
+import com.bestkayz.kkit.hiksdk.provider.impl.HikUserDTO;
 
 import java.util.Date;
 import java.util.List;
@@ -38,6 +39,8 @@ public interface HikSDKProvider {
 
     Result addPersonFace(String personId,byte[] face);
 
+    Result queryPersonFace(String personId);
+
     Result delUserInfo(String strEmployeeID);
 
     Result<List<Map<String,Object>>> getRecord(long startTime, long endTime,int count);
@@ -56,9 +59,10 @@ public interface HikSDKProvider {
 
     Result setOneFace(String strCardNo, byte[] face);
 
-    Result<List<String>> getAllCard();
+    Result<List<HikUserDTO>> getAllUserCard();
 
     Result<byte[]> getOneFace(String strCardNo);
 
+    // 获取设备上人员信息
     Result queryDeviceEmployee(String sno);
 }

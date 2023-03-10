@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.bestkayz.kkit.common.core.base.Result;
 import com.bestkayz.kkit.common.core.utils.ObjectAssertUtil;
 import com.bestkayz.kkit.common.tools.DateTimeUtil;
+import com.bestkayz.kkit.common.tools.TypeConverter;
 import com.bestkayz.kkit.hiksdk.exceptions.HikSDKException;
 import com.bestkayz.kkit.hiksdk.lib.*;
 import com.bestkayz.kkit.hiksdk.provider.HikSDKProvider;
@@ -104,10 +105,10 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
     }
 
     private HikSDKException handleException(String msg,Integer code){
-        return new HikSDKException(code,"IP:"+ ip+ " ,操作:" +msg+" ,代码:"+ code + " 错误:" + HCNetSDKErrorCode.codeMsg(code));
+        return new HikSDKException(code,"操作:" +msg + " ,IP:"+ ip+ " ,代码:"+ code + " 错误:" + HCNetSDKErrorCode.codeMsg(code));
     }
     private HikSDKException handleException(String msg,Exception e){
-        return new HikSDKException(-1,"IP:"+ ip+ " ,操作:" +msg+" ,代码:"+ -1 + " 错误:" + HCNetSDKErrorCode.codeMsg(-1));
+        return new HikSDKException(-1,"操作:" +msg + " ,IP:"+ ip+ " ,代码:" + -1 + " 错误:" + HCNetSDKErrorCode.codeMsg(-1));
     }
 
     public void login() {
@@ -416,6 +417,119 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
 
     }
 
+    @Override
+    public Result queryPersonFace(String personId) {
+        String strURL = "GET /ISAPI/Intelligent/FDLib/Count?format=json";
+        HCNetSDK.BYTE_ARRAY ptrUrl = new HCNetSDK.BYTE_ARRAY(BYTE_ARRAY_LEN);
+        System.arraycopy(strURL.getBytes(), 0, ptrUrl.byValue, 0, strURL.length());
+        ptrUrl.write();
+
+        HCNetSDK.NET_DVR_XML_CONFIG_INPUT struXMLInput = new HCNetSDK.NET_DVR_XML_CONFIG_INPUT();
+        struXMLInput.read();
+        struXMLInput.dwSize = struXMLInput.size();
+        struXMLInput.lpRequestUrl = ptrUrl.getPointer();
+        struXMLInput.dwRequestUrlLen = ptrUrl.byValue.length;
+//        struXMLInput.lpInBuffer = ptrInBuffer.getPointer();
+//        struXMLInput.dwInBufferSize = ptrInBuffer.byValue.length;
+        struXMLInput.write();
+
+        HCNetSDK.BYTE_ARRAY ptrStatusByte = new HCNetSDK.BYTE_ARRAY(ISAPI_STATUS_LEN);
+        ptrStatusByte.read();
+
+        HCNetSDK.BYTE_ARRAY ptrOutByte = new HCNetSDK.BYTE_ARRAY(ISAPI_DATA_LEN);
+        ptrOutByte.read();
+        HCNetSDK.NET_DVR_XML_CONFIG_OUTPUT struXMLOutput = new HCNetSDK.NET_DVR_XML_CONFIG_OUTPUT();
+        struXMLOutput.read();
+        struXMLOutput.dwSize = struXMLOutput.size();
+        struXMLOutput.lpOutBuffer = ptrOutByte.getPointer();
+        struXMLOutput.dwOutBufferSize = ptrOutByte.size();
+        struXMLOutput.lpStatusBuffer = ptrStatusByte.getPointer();
+        struXMLOutput.dwStatusSize  = ptrStatusByte.size();
+        struXMLOutput.write();
+
+        if(!hCNetSDK.NET_DVR_STDXMLConfig(lUserID, struXMLInput, struXMLOutput)) {
+            return Result.fail(HCNetSDKErrorCode.codeMsg(hCNetSDK.NET_DVR_GetLastError()));
+        } else {
+            struXMLOutput.read();
+            ptrOutByte.read();
+            ptrStatusByte.read();
+            String strOutXML = new String(ptrOutByte.byValue).trim();
+            JSONObject reback = JSONObject.parseObject(strOutXML);
+            int statusCode = reback.getInteger("statusCode");
+            String statusString = reback.getString("statusString");
+            if (statusCode == 1) {
+
+                String commandUrl = "POST /ISAPI/Intelligent/FDLib/FDSearch?format=json";
+                HCNetSDK.BYTE_ARRAY ptrByteArray = new HCNetSDK.BYTE_ARRAY(1024);
+                System.arraycopy(commandUrl.getBytes(), 0,
+                        ptrByteArray.byValue, 0, commandUrl.length());
+                ptrByteArray.write();
+                int handler = hCNetSDK.NET_DVR_StartRemoteConfig(
+                        lUserID,
+                        2552,
+                        ptrByteArray.getPointer(),
+                        commandUrl.length(),
+                        null,
+                        null);
+                //如果获取长连接失败，则进行重连
+                if (handler < 0) {
+                    throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
+                }
+                try {
+
+                    String queryStr = "{\"searchResultPosition\":1,\"maxResults\":30,\"FDID\":\"1\"}";
+
+                    HCNetSDK.BYTE_ARRAY ptrByteArrayJsonInput = new HCNetSDK.BYTE_ARRAY(queryStr.length());
+                    System.arraycopy(queryStr.getBytes(), 0, ptrByteArrayJsonInput.byValue, 0, queryStr.length());
+                    ptrByteArrayJsonInput.write();
+
+                    HCNetSDK.BYTE_ARRAY ptrByteArrayJsonOutput = new HCNetSDK.BYTE_ARRAY(2048);
+                    IntByReference iOutpuSize = new IntByReference(0);
+                    int result = hCNetSDK.NET_DVR_SendWithRecvRemoteConfig(
+                            handler,
+                            ptrByteArrayJsonInput.getPointer(),
+                            ptrByteArrayJsonInput.byValue.length,
+                            ptrByteArrayJsonOutput.getPointer(),
+                            1024*4,
+                            iOutpuSize
+                    );
+                    if(result < 0)
+                    {
+                        throw  handleException("查询人员信息",hCNetSDK.NET_DVR_GetLastError());
+                    }
+
+                    ptrByteArrayJsonOutput.read();
+                    byte[] strOut = new byte[2048];
+                    System.arraycopy(ptrByteArrayJsonOutput.byValue, 0, strOut, 0, iOutpuSize.getValue());
+                    String strRet = new String(strOut).trim();
+                    reback = JSONObject.parseObject(strRet);
+                    JSONObject searchRe = reback.getJSONObject("UserInfoSearch");
+                    if (searchRe != null) {
+                        String statusStrg = searchRe.getString("responseStatusStrg");
+                        if (!"NO MATCH".equals(statusStrg)){
+                            return Result.success(true);
+                        }else {
+                            return Result.success(false);
+                        }
+                    }else {
+                        statusCode = reback.getInteger("statusCode");
+                        statusString = reback.getString("statusString");
+                        return Result.fail("查询人员信息失败 机号:"+deviceId+" SNO:"+" 错误信息:"+statusString+" 返回数据:"+strRet);
+                    }
+                }finally {
+                    if( handler > 0 ){
+                        hCNetSDK.NET_DVR_StopRemoteConfig(handler);
+                        // System.out.println("关闭长连接！");
+                    }
+                }
+
+            }else {
+                return Result.fail("查询设备内人员失败 机号:"+deviceId+" PersonId:"+personId+" 错误信息:"+statusString+" 返回数据:"+strOutXML);
+            }
+        }
+
+    }
+
     public static final int ISAPI_DATA_LEN = 1024*1024;
     public static final int ISAPI_STATUS_LEN = 4*4096;
     public static final int BYTE_ARRAY_LEN = 1024;
@@ -546,7 +660,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
     }
 
     public Result<List<Map<String,Object>>> getRecord(long startTime, long endTime,int count){
-        try {
+
             HCNetSDK.NET_DVR_ACS_EVENT_COND struEventCond = new HCNetSDK.NET_DVR_ACS_EVENT_COND();
             struEventCond.read();
             struEventCond.dwSize = struEventCond.size();
@@ -590,10 +704,11 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struEventCond.wInductiveEventType = 0;
             struEventCond.bySearchType = 0;
             //struEventCond.szMonitorID = 0;
-
+        int m_lsetEventCfgHandle = -1;
+        try {
             struEventCond.write();
             Pointer ptrEventCond = struEventCond.getPointer();
-            int m_lsetEventCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID,HCNetSDK.NET_DVR_GET_ACS_EVENT,ptrEventCond,struEventCond.size(),null,null);
+            m_lsetEventCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID,HCNetSDK.NET_DVR_GET_ACS_EVENT,ptrEventCond,struEventCond.size(),null,null);
             if (m_lsetEventCfgHandle == -1) {
                 throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());            } else {
                 //log.debug("建立长连接成功！");
@@ -681,6 +796,11 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             return Result.success(list);
         }catch (Exception e){
             return Result.fail(e.getMessage());
+        }finally {
+            if( m_lsetEventCfgHandle > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(m_lsetEventCfgHandle);
+                // System.out.println("关闭长连接！");
+            }
         }
     }
 
@@ -789,6 +909,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
 
     @Override
     public Result delOneCard(String strCardNo){
+        int m_lSetCardCfgHandle = -1;
         try{
             HCNetSDK.NET_DVR_CARD_COND struCardCond = new HCNetSDK.NET_DVR_CARD_COND();
             struCardCond.read();
@@ -796,7 +917,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struCardCond.dwCardNum = 1;  //下发一张
             struCardCond.write();
             Pointer ptrStruCond = struCardCond.getPointer();
-            int m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_DEL_CARD, ptrStruCond, struCardCond.size(),null ,null);
+            m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_DEL_CARD, ptrStruCond, struCardCond.size(),null ,null);
             if (m_lSetCardCfgHandle == -1) {
                 throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
             }
@@ -846,6 +967,11 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             return Result.success();
         }catch (Exception e){
             return Result.fail(e.getMessage());
+        }finally {
+            if( m_lSetCardCfgHandle > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(m_lSetCardCfgHandle);
+                // System.out.println("关闭长连接！");
+            }
         }
     }
 
@@ -879,6 +1005,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
     }
 
     public Result setOneCard(String strCardNo, String sno, String name){
+        int m_lSetCardCfgHandle = -1;
         try {
             HCNetSDK.NET_DVR_CARD_COND struCardCond = new HCNetSDK.NET_DVR_CARD_COND();
             struCardCond.read();
@@ -887,7 +1014,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struCardCond.write();
             Pointer ptrStruCond = struCardCond.getPointer();
 
-            int m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_SET_CARD, ptrStruCond, struCardCond.size(),null ,null);
+            m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_SET_CARD, ptrStruCond, struCardCond.size(),null ,null);
             if (m_lSetCardCfgHandle == -1) {
                 throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
             } else {
@@ -990,11 +1117,17 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             return Result.success();
         }catch (Exception e){
             return Result.fail(e.getMessage());
+        }finally {
+            if( m_lSetCardCfgHandle > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(m_lSetCardCfgHandle);
+                // System.out.println("关闭长连接！");
+            }
         }
 
     }
 
     public Result setOneFace(String strCardNo, byte[] face) {
+        int m_lSetFaceCfgHandle = -1;
         try {
 
             HCNetSDK.NET_DVR_FACE_COND struFaceCond = new HCNetSDK.NET_DVR_FACE_COND();
@@ -1006,7 +1139,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struFaceCond.write();
             Pointer ptrStruFaceCond = struFaceCond.getPointer();
 
-            int m_lSetFaceCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_SET_FACE, ptrStruFaceCond, struFaceCond.size(),null ,null);
+            m_lSetFaceCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_SET_FACE, ptrStruFaceCond, struFaceCond.size(),null ,null);
             if (m_lSetFaceCfgHandle == -1)
             {
                 throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
@@ -1084,11 +1217,17 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             return Result.success();
         }catch (Exception e){
             return Result.fail(e.getMessage());
+        }finally {
+            if( m_lSetFaceCfgHandle > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(m_lSetFaceCfgHandle);
+                // System.out.println("关闭长连接！");
+            }
         }
 
     }
 
-    public Result<List<String>> getAllCard() {
+    public Result<List<HikUserDTO>> getAllUserCard() {
+        int m_lSetCardCfgHandle = -1;
         try {
             HCNetSDK. NET_DVR_CARD_COND struCardCond = new HCNetSDK.NET_DVR_CARD_COND();
             struCardCond.read();
@@ -1097,7 +1236,7 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struCardCond.write();
             Pointer ptrStruCond = struCardCond.getPointer();
 
-            int m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_GET_CARD, ptrStruCond, struCardCond.size(),null ,null);
+            m_lSetCardCfgHandle = hCNetSDK.NET_DVR_StartRemoteConfig(lUserID, HCNetSDK.NET_DVR_GET_CARD, ptrStruCond, struCardCond.size(),null ,null);
             if (m_lSetCardCfgHandle == -1)
             {
                 throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
@@ -1108,8 +1247,8 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
             struCardRecord.write();
 
             IntByReference pInt = new IntByReference(0);
-            List<String> cardList = new ArrayList<>();
             int dwState;
+            List<HikUserDTO> list = new ArrayList<>();
             while(true){
                 dwState = hCNetSDK. NET_DVR_GetNextRemoteConfig(m_lSetCardCfgHandle, struCardRecord.getPointer(), struCardRecord.size());
                 struCardRecord.read();
@@ -1136,26 +1275,99 @@ public class HikSDKProviderImpl extends HikSDKDevice implements HikSDKProvider {
                 else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_SUCCESS)
                 {
                     try {
-                        //System.out.println("********************************************");
-                        cardList.add(new String(struCardRecord.byCardNo).trim());
-                        //System.out.println("********************************************");
+                        HikUserDTO hikUserDTO = new HikUserDTO();
+                        hikUserDTO.setEmployeeNo(""+struCardRecord.dwEmployeeNo);
+                        hikUserDTO.setCardNo(new String(struCardRecord.byCardNo).trim());
+                        list.add(hikUserDTO);
+                        //log.debug("读取到卡号字节 {} : {}",new String(struCardRecord.byCardNo).trim(), TypeConverter.bytesToHexString(struCardRecord.byCardNo));
                     } catch (Exception e) {
                         // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        log.error("读取员工信息出错 {}",e.getMessage());
                     }
                     continue;
                 }
                 else if(dwState == HCNetSDK.NET_SDK_CONFIG_STATUS_FINISH) {
-                    System.out.println("获取卡参数完成");
+                    log.info("读取设备所有卡信息完毕 总数量：{}",list.size());
                     break;
                 }
             }
-            return Result.success(cardList);
+            return Result.success(list);
         }catch (Exception e){
             return Result.fail(e.getMessage());
+        }finally {
+            if( m_lSetCardCfgHandle > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(m_lSetCardCfgHandle);
+                // System.out.println("关闭长连接！");
+            }
         }
     }
 
+
+    public Result getAllCardV2(){
+        String commandUrl = "POST /ISAPI/AccessControl/CardInfo/Search?format=json";
+        HCNetSDK.BYTE_ARRAY ptrByteArray = new HCNetSDK.BYTE_ARRAY(1024);
+        System.arraycopy(commandUrl.getBytes(), 0,
+                ptrByteArray.byValue, 0, commandUrl.length());
+        ptrByteArray.write();
+        int handler = hCNetSDK.NET_DVR_StartRemoteConfig(
+                lUserID,
+                2550,
+                ptrByteArray.getPointer(),
+                commandUrl.length(),
+                null,
+                null);
+        //如果获取长连接失败，则进行重连
+        if (handler < 0) {
+            throw  handleException("获取长连接失败",hCNetSDK.NET_DVR_GetLastError());
+        }
+        try {
+
+            String queryStr = strInBuffer1;
+
+            HCNetSDK.BYTE_ARRAY ptrByteArrayJsonInput = new HCNetSDK.BYTE_ARRAY(queryStr.length());
+            System.arraycopy(queryStr.getBytes(), 0, ptrByteArrayJsonInput.byValue, 0, queryStr.length());
+            ptrByteArrayJsonInput.write();
+
+            HCNetSDK.BYTE_ARRAY ptrByteArrayJsonOutput = new HCNetSDK.BYTE_ARRAY(2048);
+            IntByReference iOutpuSize = new IntByReference(0);
+            int result = hCNetSDK.NET_DVR_SendWithRecvRemoteConfig(
+                    handler,
+                    ptrByteArrayJsonInput.getPointer(),
+                    ptrByteArrayJsonInput.byValue.length,
+                    ptrByteArrayJsonOutput.getPointer(),
+                    1024*4,
+                    iOutpuSize
+            );
+            if(result < 0)
+            {
+                throw  handleException("查询人员信息",hCNetSDK.NET_DVR_GetLastError());
+            }
+
+            ptrByteArrayJsonOutput.read();
+            byte[] strOut = new byte[2048];
+            System.arraycopy(ptrByteArrayJsonOutput.byValue, 0, strOut, 0, iOutpuSize.getValue());
+            String strRet = new String(strOut).trim();
+            JSONObject reback = JSONObject.parseObject(strRet);
+            JSONObject searchRe = reback.getJSONObject("UserInfoSearch");
+            if (searchRe != null) {
+                String statusStrg = searchRe.getString("responseStatusStrg");
+                if (!"NO MATCH".equals(statusStrg)){
+                    return Result.success(true);
+                }else {
+                    return Result.success(false);
+                }
+            }else {
+                int statusCode = reback.getInteger("statusCode");
+                String statusString = reback.getString("statusString");
+                return Result.fail("查询人员信息失败 机号:"+deviceId+" 错误信息:"+statusString+" 返回数据:"+strRet);
+            }
+        }finally {
+            if( handler > 0 ){
+                hCNetSDK.NET_DVR_StopRemoteConfig(handler);
+                // System.out.println("关闭长连接！");
+            }
+        }
+    }
 
     public Result<byte[]> getOneFace(String strCardNo){
         try {

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>scp</artifactId>
+        <groupId>io.github.kayz666</groupId>
+        <version>1.0.4</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>scp-example</artifactId>
+    <packaging>pom</packaging>
+    <modules>
+        <module>scp-example-tcp-client</module>
+        <module>scp-example-tcp-server</module>
+        <module>scp-example-udp-client</module>
+        <module>scp-example-udp-server</module>
+        <module>scp-example-mqtt-client</module>
+        <module>scp-example-mqtt-server</module>
+        <module>scp-example-http-client</module>
+        <module>scp-example-http-server</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+    </properties>
+
+</project>

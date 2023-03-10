@@ -24,11 +24,11 @@ public class HikAspectImpl implements InvocationHandler {
         if (method.getName().equals("release")){
             return method.invoke(providerImpl,args);
         }
-        if (!providerImpl.isLogin()){
-            providerImpl.login();
-            providerImpl.setLog("C:\\SdkLog\\");
-        }
         try {
+            if (!providerImpl.isLogin()){
+                providerImpl.login();
+                providerImpl.setLog("C:\\SdkLog\\");
+            }
             providerImpl.lock();
             Object returnValue=method.invoke(providerImpl,args);
             return returnValue;

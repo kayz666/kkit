@@ -38,6 +38,7 @@
         <module>common</module>
         <module>mqtt</module>
         <module>plugins</module>
+        <module>scp</module>
     </modules>
 
     <properties>
